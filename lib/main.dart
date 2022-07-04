@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -32,16 +34,21 @@ class _HomePageState extends State<HomePage> {
   List<User> _users = [];
 
   Future<void> _fetchUsers(String query) async {
-    final response =
-        await Dio().get('https://api.github.com/search/users?q=$query');
-    List list = response.data['items'];
-    _users = list.map((e) => User.fromMap(e)).toList();
+    final response = await Dio().get(
+      'https://api.github.com/search/users',
+      queryParameters: {
+        'q': query,
+      },
+    );
+    final list = response.data['items'] as List;
+    _users = list.map((user) => User.fromMap(user)).toList();
     setState(() {});
   }
 
   @override
   void initState() {
     super.initState();
+    if (Platform.isAndroid) WebView.platform = AndroidWebView();
     _fetchUsers('hoshi');
   }
 
