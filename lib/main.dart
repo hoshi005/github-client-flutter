@@ -35,16 +35,17 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncValue = ref.watch(usersProvider);
+    final stateController = ref.read(queryProvider.notifier);
     return Scaffold(
       appBar: AppBar(
         title: TextFormField(
-          initialValue: 'hoshi',
+          initialValue: stateController.state,
           decoration: const InputDecoration(
             fillColor: Colors.white,
             filled: true,
           ),
           onFieldSubmitted: (value) {
-            ref.read(queryProvider.notifier).state = value;
+            stateController.state = value;
           },
         ),
       ),
