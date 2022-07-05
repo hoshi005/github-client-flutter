@@ -1,11 +1,17 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:github_client/view_model/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 void main() {
-  runApp(const MyApp());
+  if (Platform.isAndroid) WebView.platform = AndroidWebView();
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -23,37 +29,12 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+class HomePage extends ConsumerWidget {
+  const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  List<User> _users = [];
-
-  Future<void> _fetchUsers(String query) async {
-    final response = await Dio().get(
-      'https://api.github.com/search/users',
-      queryParameters: {
-        'q': query,
-      },
-    );
-    final list = response.data['items'] as List;
-    _users = list.map((user) => User.fromMap(user)).toList();
-    setState(() {});
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    if (Platform.isAndroid) WebView.platform = AndroidWebView();
-    _fetchUsers('hoshi');
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncValue = ref.watch(usersProvider);
     return Scaffold(
       appBar: AppBar(
         title: TextFormField(
@@ -63,74 +44,60 @@ class _HomePageState extends State<HomePage> {
             filled: true,
           ),
           onFieldSubmitted: (value) {
-            _fetchUsers(value);
+            ref.read(queryProvider.notifier).state = value;
           },
         ),
       ),
-      body: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-        ),
-        itemCount: _users.length,
-        itemBuilder: (_, index) {
-          final user = _users[index];
-          return InkWell(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) {
-                    return Scaffold(
-                      appBar: AppBar(
-                        title: Text(user.login),
+      body: asyncValue.when(
+        data: (users) {
+          return GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: users.length,
+            itemBuilder: (_, index) {
+              final user = users[index];
+              return InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) {
+                        return Scaffold(
+                          appBar: AppBar(
+                            title: Text(user.login),
+                          ),
+                          body: WebView(
+                            initialUrl: user.htmlUrl,
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipOval(
+                      child: Image.network(
+                        user.avatarUrl,
+                        fit: BoxFit.cover,
                       ),
-                      body: WebView(
-                        initialUrl: user.htmlUrl,
-                      ),
-                    );
-                  },
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Text(user.login),
+                    ),
+                  ],
                 ),
               );
             },
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ClipOval(
-                  child: Image.network(
-                    user.avatarUrl,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomRight,
-                  child: Text(user.login),
-                ),
-              ],
-            ),
           );
         },
+        error: (e, _) => Text(e.toString()),
+        loading: () => const Center(child: CircularProgressIndicator()),
       ),
-    );
-  }
-}
-
-class User {
-  final String login;
-  final String avatarUrl;
-  final String htmlUrl;
-
-  User({
-    required this.login,
-    required this.avatarUrl,
-    required this.htmlUrl,
-  });
-
-  factory User.fromMap(Map<String, dynamic> user) {
-    return User(
-      login: user['login'],
-      avatarUrl: user['avatar_url'],
-      htmlUrl: user['html_url'],
     );
   }
 }
